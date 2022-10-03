@@ -37,11 +37,14 @@ const (
 )
 
 func check(addr string) int {
+	start := time.Now()
 	dialCtx, dialCancel := context.WithTimeout(context.Background(), timeout)
 	defer dialCancel()
 	conn, err := grpc.DialContext(dialCtx, addr, grpc.WithBlock(), grpc.WithInsecure())
 	if err != nil {
 		log.Printf("failed to connect to service at %q: %+v", addr, err)
+		elapsed := time.Since(start)
+		log.Printf("check took %s", elapsed)
 		return connectionFailure
 	}
 	defer conn.Close()
@@ -51,13 +54,19 @@ func check(addr string) int {
 	resp, err := healthpb.NewHealthClient(conn).Check(rpcCtx, &healthpb.HealthCheckRequest{Service: ""})
 	if err != nil {
 		log.Printf("failed to do health rpc call: %+v", err)
+		elapsed := time.Since(start)
+		log.Printf("check took %s", elapsed)
 		return rpcFailure
 	}
 
 	if resp.GetStatus() != healthpb.HealthCheckResponse_SERVING {
 		log.Printf("service unhealthy (responded with %q)", resp.GetStatus().String())
+		elapsed := time.Since(start)
+		log.Printf("check took %s", elapsed)
 		return unhealthy
 	}
+	elapsed := time.Since(start)
+	log.Printf("check took %s", elapsed)
 	log.Printf("status: %v", resp.GetStatus().String())
 	return 0
 }
